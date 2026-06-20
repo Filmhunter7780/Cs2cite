@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anono — Анонимный чат по интересам</title>
+<meta name="description" content="Анонимный чат-рулетка по интересам. Найди собеседника по CS2, Dota 2, аниме, музыке и другим темам.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg-2: #0f0f17;
+    --surface: #14141f;
+    --surface-2: #1c1c2a;
+    --border: #2a2a3a;
+    --fg: #f5f5f7;
+    --muted: #7a7a8e;
+    --accent: #ff2e63;
+    --accent-2: #00ffa3;
+    --accent-3: #ffd23f;
+  }
+  
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  
+  html { scroll-behavior: smooth; }
+  
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    margin: 0;
+    overflow-x: hidden;
+    line-height: 1.5;
+  }
+  
+  .font-display { font-family: 'Syne', sans-serif; letter-spacing: -0.02em; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  
+  /* анимированный фон */
+  .bg-aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.35;
+    animation: float 20s ease-in-out infinite;
+  }
+  
+  .blob-1 { width: 500px; height: 500px; background: var(--accent); top: -100px; left: -100px; }
+  .blob-2 { width: 400px; height: 400px; background: var(--accent-2); bottom: -100px; right: -100px; animation-delay: -10s; }
+  .blob-3 { width: 350px; height: 350px; background: var(--accent-3); top: 40%; left: 50%; opacity: 0.15; animation-delay: -5s; }
+  
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(80px, -40px) scale(1.1); }
+    66% { transform: translate(-60px, 80px) scale(0.9); }
+  }
+  
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image: 
+      linear-gradient(rgba(255,46,99,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,46,99,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+    pointer-events: none;
+  }
+  
+  /* шум */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.04;
+    mix-blend-mode: overlay;
+  }
+  
+  /* кнопки */
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    padding: 14px 28px;
+    border-radius: 14px;
+    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.6s;
+  }
+  
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 30px -8px var(--accent); }
+  .btn-primary:hover::before { transform: translateX(100%); }
+  
+  .btn-ghost {
+    background: transparent;
+    color: var(--fg);
+    padding: 12px 24px;
+    border-radius: 14px;
+    font-weight: 500;
+    transition: all 0.3s;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .btn-ghost:hover { border-color: var(--accent); background: rgba(255,46,99,0.05); }
+  
+  /* карточки категорий */
+  .category-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 28px;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .category-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, var(--cat-color, var(--accent)), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  
+  .category-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--cat-color, var(--accent));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s;
+  }
+  
+  .category-card:hover {
+    transform: translateY(-6px);
+    border-color: var(--cat-color, var(--accent));
+    box-shadow: 0 20px 40px -20px var(--cat-color, var(--accent));
+  }
+  
+  .category-card:hover::before { opacity: 0.15; }
+  .category-card:hover::after { transform: scaleX(1); }
+  
+  .category-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: var(--cat-color, var(--accent));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    transition: transform 0.4s;
+    position: relative;
+    z-index: 1;
+  }
+  
+  .category-card:hover .category-icon { transform: scale(1.1) rotate(-5deg); }
+  
+  /* чат */
+  .chat-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  
+  .chat-overlay.active { display: flex; animation: fadeIn 0.3s; }
+  
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  
+  .chat-window {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    width: 100%;
+    max-width: 1000px;
+    height: 100%;
+    max-height: 720px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+  }
+  
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  
+  /* анимация набора */
+  .typing-dots { display: inline-flex; gap: 4px; align-items: center; }
+  .typing-dots span {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: var(--muted);
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  
+  @keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-8px); opacity: 1; }
+  }
+  
+  /* скролл */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  
+  /* сообщение */
+  .message {
+    max-width: 75%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    margin-bottom: 10px;
+    animation: slideIn 0.3s ease-out;
+    word-wrap: break-word;
+    line-height: 1.4;
+    font-size: 15px;
+  }
+  
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .message.received {
+    background: var(--surface-2);
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
+  }
+  
+  .message.sent {
+    background: var(--accent);
+    color: white;
+    border-bottom-right-radius: 4px;
+    align-self: flex-end;
+  }
+  
+  .message.system {
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+    align-self: center;
+    max-width: 90%;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 8px 16px;
+  }
+  
+  /* поиск собеседника - волновая анимация */
+  .search-pulse {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .search-pulse .ring {
+    position: absolute;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    animation: pulseRing 2.5s infinite;
+  }
+  
+  .search-pulse .ring:nth-child(1) { width: 80px; height: 80px; }
+  .search-pulse .ring:nth-child(2) { width: 80px; height: 80px; animation-delay: 0.8s; }
+  .search-pulse .ring:nth-child(3) { width: 80px; height: 80px; animation-delay: 1.6s; }
+  
+  @keyframes pulseRing {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(3); opacity: 0; }
+  }
+  
+  .search-core {
+    width: 80px;
+    height: 80px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 40px var(--accent);
+    animation: corePulse 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes corePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+  
+  /* лайк кнопка */
+  .like-btn { transition: all 0.3s; }
+  .like-btn.liked {
+    background: var(--accent) !important;
+    color: white !important;
+    border-color: var(--accent) !important;
+    animation: likePop 0.4s;
+  }
+  
+  @keyframes likePop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+  }
+  
+  /* онлайн индикатор */
+  .online-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-2);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent-2);
+    animation: blink 2s infinite;
+    display: inline-block;
+  }
+  
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  
+  /* hero текст градиент */
+  .gradient-text {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-3) 50%, var(--accent-2) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  /* появление элементов */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.8s, transform 0.8s;
+  }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+  
+  /* шаги */
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px 24px;
+    position: relative;
+    transition: all 0.3s;
+  }
+  
+  .step-card:hover { transform: translateY(-4px); border-color: var(--accent); }
+  
+  .step-num {
+    position: absolute;
+    top: -16px;
+    left: 24px;
+    background: var(--accent);
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-family: 'Syne', sans-serif;
+  }
+  
+  /* hero canvas */
+  #heroCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  
+  /* тост */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 14px 22px;
+    border-radius: 14px;
+    z-index: 300;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 90%;
+  }
+  
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--accent-2); }
+  .toast.error { border-color: var(--accent); }
+  
+  /* аватар */
+  .avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-family: 'Syne', sans-serif;
+    color: white;
+    flex-shrink: 0;
+  }
+  
+  /* индикатор загрузки */
+  .loader-bar {
+    width: 100%;
+    height: 3px;
+    background: var(--surface);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .loader-bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: loaderMove 1.5s infinite;
+  }
+  
+  @keyframes loaderMove {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  
+  /* mobile */
+  @media (max-width: 768px) {
+    .chat-window { border-radius: 0; max-height: 100%; }
+    .message { max-width: 85%; }
+  }
+  
+  /* фон карточек с категориями */
+  .stat-card {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 60%);
+    opacity: 0.05;
+  }
+  
+  /* hide scrollbar for category scroll */
+  .scroll-hide::-webkit-scrollbar { display: none; }
+  .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+</head>
+<body>
+
+<div class="bg-aurora">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+<div class="grid-overlay"></div>
+
+<!-- Header -->
+<header class="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg" style="background: rgba(10,10,15,0.6); border-bottom: 1px solid var(--border);">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href="#" class="flex items-center gap-2">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: var(--accent);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+        </svg>
+      </div>
+      <span class="font-display text-2xl font-bold">Anono</span>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-sm" style="color: var(--muted);">
+      <a href="#how" class="hover:text-white transition">Как это работает</a>
+      <a href="#categories" class="hover:text-white transition">Категории</a>
+      <a href="#stats" class="hover:text-white transition">Статистика</a>
+    </nav>
+    <button onclick="scrollToCategories()" class="btn-primary text-sm" style="padding: 10px 20px;">
+      Начать
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="relative min-h-screen flex items-center pt-24 pb-12 px-6 overflow-hidden">
+  <canvas id="heroCanvas"></canvas>
+  <div class="max-w-7xl mx-auto w-full grid lg:grid-cols-2 gap-12 items-center relative z-10">
+    <div>
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6 text-xs font-mono" style="background: var(--surface); border: 1px solid var(--border); color: var(--accent-2);">
+        <span class="online-dot"></span>
+        <span id="onlineCount">2 847</span> онлайн прямо сейчас
+      </div>
+      <h1 class="font-display text-5xl md:text-7xl font-bold leading-[0.95] mb-6">
+        Найди<br>
+        <span class="gradient-text">собеседника</span><br>
+        по интересам
+      </h1>
+      <p class="text-lg mb-8 max-w-md" style="color: var(--muted);">
+        Анонимный чат-рулетка. Выбери категорию, и мы найдём тебе человека, который любит то же, что и ты. Никаких регистраций, никаких фото, никаких обязательств.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <button onclick="scrollToCategories()" class="btn-primary">
+          Начать общение
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+        <button onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})" class="btn-ghost">
+          Как это работает
+        </button>
+      </div>
+      <div class="flex items-center gap-6 mt-10 text-sm" style="color: var(--muted);">
+        <div class="flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          Без регистрации
+        </div>
+        <div class="flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          Полная анонимность
+        </div>
+        <div class="flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          Бесплатно
+        </div>
+      </div>
+    </div>
+    
+    <!-- превью чата -->
+    <div class="relative" style="display: flex; justify-content: center;">
+      <div class="relative" style="max-width: 380px; width: 100%;">
+        <div class="absolute -inset-4 rounded-3xl opacity-20 blur-2xl" style="background: var(--accent);"></div>
+        <div class="relative rounded-3xl p-1" style="background: linear-gradient(135deg, var(--accent), var(--accent-3), var(--accent-2));">
+          <div class="rounded-3xl p-6" style="background: var(--bg-2);">
+            <div class="flex items-center gap-3 pb-4 mb-4" style="border-bottom: 1px solid var(--border);">
+              <div class="avatar" style="background: linear-gradient(135deg, #ff2e63, #ffd23f);">N</div>
+              <div>
+                <div class="font-semibold text-sm">NeonWolf_42</div>
+                <div class="text-xs flex items-center gap-1.5" style="color: var(--muted);">
+                  <span class="online-dot"></span> CS2 · онлайн
+                </div>
+              </div>
+            </div>
+            <div class="space-y-2.5">
+              <div class="message received">Привет! Какой ранг в CS2?</div>
+              <div class="message sent">ЛЭ, а ты?</div>
+              <div class="message received">Глобал, недавно апнул. Мираж любишь?</div>
+              <div class="message sent">Mirage топ, на B сайте отлично держу</div>
+              <div class="message received">Огонь, го катку как-нибудь</div>
+              <div class="flex items-center gap-2 mt-4" style="color: var(--muted); font-size: 12px;">
+                <div class="typing-dots"><span></span><span></span><span></span></div>
+                <span>печатает...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how" class="py-24 px-6 relative">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-16 reveal">
+      <div class="font-mono text-xs uppercase tracking-widest mb-3" style="color: var(--accent);">Как это работает</div>
+      <h2 class="font-display text-4xl md:text-5xl font-bold">Три шага до разговора</h2>
+    </div>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="step-card reveal">
+        <div class="step-num">1</div>
+        <h3 class="font-display text-xl font-bold mb-3 mt-4">Выбери категорию</h3>
+        <p style="color: var(--muted);">CS2, аниме, музыка, программирование — десятки тем для общения. Найди ту, что зажигает тебя.</p>
+      </div>
+      <div class="step-card reveal" style="transition-delay: 0.15s;">
+        <div class="step-num">2</div>
+        <h3 class="font-display text-xl font-bold mb-3 mt-4">Найди собеседника</h3>
+        <p style="color: var(--muted);">Алгоритм подберёт человека из той же категории. Поиск занимает пару секунд.</p>
+      </div>
+      <div class="step-card reveal" style="transition-delay: 0.3s;">
+        <div class="step-num">3</div>
+        <h3 class="font-display text-xl font-bold mb-3 mt-4">Общайся анонимно</h3>
+        <p style="color: var(--muted);">Никаких имён и фото. Если оба поставите лайк — откроется возможность обменяться контактами.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Categories -->
+<section id="categories" class="py-24 px-6 relative">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4 reveal">
+      <div>
+        <div class="font-mono text-xs uppercase tracking-widest mb-3" style="color: var(--accent);">Категории</div>
+        <h2 class="font-display text-4xl md:text-5xl font-bold">О чём будем говорить?</h2>
+      </div>
+      <p class="max-w-sm" style="color: var(--muted);">Выбери тему, и мы найдём собеседника, который разделяет твои интересы.</p>
+    </div>
+    <div id="categoriesGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+  </div>
+</section>
+
+<!-- Stats -->
+<section id="stats" class="py-24 px-6 relative">
+  <div class="max-w-7xl mx-auto">
+    <div class="grid md:grid-cols-4 gap-5">
+      <div class="stat-card reveal">
+        <div class="font-display text-5xl font-bold gradient-text mb-2" id="stat1">2 847</div>
+        <div class="text-sm" style="color: var(--muted);">человек онлайн</div>
+      </div>
+      <div class="stat-card reveal" style="transition-delay: 0.1s;">
+        <div class="font-display text-5xl font-bold gradient-text mb-2">187K</div>
+        <div class="text-sm" style="color: var(--muted);">соединений сегодня</div>
+      </div>
+      <div class="stat-card reveal" style="transition-delay: 0.2s;">
+        <div class="font-display text-5xl font-bold gradient-text mb-2">12</div>
+        <div class="text-sm" style="color: var(--muted);">категорий интересов</div>
+      </div>
+      <div class="stat-card reveal" style="transition-delay: 0.3s;">
+        <div class="font-display text-5xl font-bold gradient-text mb-2">98%</div>
+        <div class="text-sm" style="color: var(--muted);">нашли собеседника</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="py-24 px-6 relative">
+  <div class="max-w-4xl mx-auto text-center reveal">
+    <h2 class="font-display text-4xl md:text-6xl font-bold mb-6">Готов найти <span class="gradient-text">своего человека?</span></h2>
+    <p class="text-lg mb-8" style="color: var(--muted);">Ты в одном клике от разговора, который может изменить твой вечер. Или жизнь.</p>
+    <button onclick="scrollToCategories()" class="btn-primary text-base" style="padding: 18px 36px; font-size: 16px;">
+      Выбрать категорию
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="py-12 px-6" style="border-top: 1px solid var(--border);">
+  <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background: var(--accent);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      </div>
+      <span class="font-display font-bold">Anono</span>
+      <span class="text-sm ml-2" style="color: var(--muted);">© 2025 — анонимный чат по интересам</span>
+    </div>
+    <div class="flex items-center gap-6 text-sm" style="color: var(--muted);">
+      <a href="#" class="hover:text-white transition">Правила</a>
+      <a href="#" class="hover:text-white transition">Приватность</a>
+      <a href="#" class="hover:text-white transition">Поддержка</a>
+    </div>
+  </div>
+</footer>
+
+<!-- Chat Overlay -->
+<div id="chatOverlay" class="chat-overlay">
+  <div class="chat-window" id="chatWindow">
+    
+    <!-- Состояние: поиск -->
+    <div id="searchState" class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+      <div class="search-pulse mb-8">
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="search-core">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </div>
+      </div>
+      <div class="font-display text-2xl font-bold mb-2">Ищем собеседника...</div>
+      <div class="text-sm mb-6" style="color: var(--muted);" id="searchCategory">Категория: CS2</div>
+      <div class="loader-bar max-w-xs mb-6"></div>
+      <div class="text-xs font-mono" style="color: var(--muted);" id="searchStatus">Подключаемся к сети...</div>
+      <button onclick="cancelSearch()" class="btn-ghost mt-8 text-sm" style="padding: 10px 20px;">
+        Отмена
+      </button>
+    </div>
+    
+    <!-- Состояние: чат -->
+    <div id="chatState" class="flex-1 flex flex-col" style="display: none;">
+      <!-- Шапка -->
+      <div class="flex items-center justify-between p-4" style="border-bottom: 1px solid var(--border); background: var(--surface);">
+        <div class="flex items-center gap-3">
+          <div class="avatar" id="partnerAvatar">A</div>
+          <div>
+            <div class="font-semibold text-sm flex items-center gap-2">
+              <span id="partnerName">Аноним</span>
+              <span class="online-dot"></span>
+            </div>
+            <div class="text-xs" style="color: var(--muted);" id="partnerCategory">CS2 · онлайн</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="likeBtn" onclick="likePartner()" class="btn-ghost like-btn text-sm" style="padding: 8px 14px;" title="Нравится собеседник">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span class="hidden sm:inline">Лайк</span>
+          </button>
+          <button onclick="nextPartner()" class="btn-ghost text-sm" style="padding: 8px 14px;" title="Следующий собеседник">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
+            <span class="hidden sm:inline">Дальше</span>
+          </button>
+          <button onclick="endChat()" class="btn-ghost text-sm" style="padding: 8px 14px; color: var(--accent);" title="Завершить">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Сообщения -->
+      <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 flex flex-col" style="background: var(--bg);"></div>
+      
+      <!-- Поле ввода -->
+      <div class="p-4" style="border-top: 1px solid var(--border); background: var(--surface);">
+        <div id="matchNotice" class="mb-3 p-3 rounded-xl text-sm hidden" style="background: linear-gradient(135deg, rgba(255,46,99,0.15), rgba(0,255,163,0.15)); border: 1px solid var(--accent);">
+          <div class="flex items-center gap-2 mb-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--accent)" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <strong>Взаимная симпатия!</strong>
+          </div>
+          <div style="color: var(--muted);">Вы оба поставили лайк. Можете обменяться контактами:</div>
+          <div class="flex gap-2 mt-2">
+            <button onclick="shareContact()" class="btn-primary text-xs" style="padding: 8px 14px;">Поделиться моим контактом</button>
+            <button onclick="document.getElementById('matchNotice').classList.add('hidden')" class="btn-ghost text-xs" style="padding: 8px 14px;">Позже</button>
+          </div>
+        </div>
+        <form onsubmit="sendMessage(event)" class="flex gap-2">
+          <input
+            id="messageInput"
+            type="text"
+            placeholder="Напиши сообщение..."
+            autocomplete="off"
+            maxlength="500"
+            class="flex-1 px-4 py-3 rounded-xl outline-none transition"
+            style="background: var(--bg); border: 1px solid var(--border); color: var(--fg);"
+          />
+          <button type="submit" class="btn-primary" style="padding: 12px 18px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+// ============== ДАННЫЕ ==============
+
+const categories = [
+  {
+    id: 'cs2', name: 'CS2', desc: 'Counter-Strike 2', color: '#ff2e63', online: 1247,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>'
+  },
+  {
+    id: 'dota', name: 'Dota 2', desc: 'MOBA от Valve', color: '#ff5e3a', online: 892,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>'
+  },
+  {
+    id: 'valorant', name: 'Valorant', desc: 'Тактический шутер', color: '#ff4655', online: 634,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/></svg>'
+  },
+  {
+    id: 'anime', name: 'Аниме', desc: 'От сёнена до сэйнэна', color: '#ff69b4', online: 1538,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+  },
+  {
+    id: 'games', name: 'Игры', desc: 'Все жанры и платформы', color: '#00f0ff', online: 2104,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.152A4 4 0 0 0 17.32 5z"/></svg>'
+  },
+  {
+    id: 'music', name: 'Музыка', desc: 'Все жанры и исполнители', color: '#00ffa3', online: 967,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
+  },
+  {
+    id: 'movies', name: 'Кино', desc: 'Фильмы и сериалы', color: '#ffd23f', online: 743,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>'
+  },
+  {
+    id: 'code', name: 'Программирование', desc: 'Код, технологии, IT', color: '#c4ff00', online: 521,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>'
+  },
+  {
+    id: 'books', name: 'Книги', desc: 'Литература всех видов', color: '#e8a87c', online: 312,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'
+  },
+  {
+    id: 'sport', name: 'Спорт', desc: 'Все виды спорта', color: '#ff8c00', online: 458,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>'
+  },
+  {
+    id: 'art', name: 'Искусство', desc: 'Творчество во всех формах', color: '#ee82ee', online: 287,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>'
+  },
+  {
+    id: 'travel', name: 'Путешествия', desc: 'Страны, города, приключения', color: '#20b2aa', online: 396,
+    icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>'
+  }
+];
+
+// ответы ботов по категориям
+const botData = {
+  cs2: {
+    nicks: ['NeonWolf_42', 'HeadshotHunter', 'MirageMaster', 'AWP_Only', 'ClutchKing_99', 'FrostBiteCS', 'SmokeCriminal'],
+    greetings: [
+      'Привет! Какой ранг в CS2?',
+      'Йоу, видел вчерашний финал мейджора?',
+      'Хай! Что думаешь о новом патче?',
+      'Привет, го поговорим о CS2, устал от каток соло',
+      'Хей, играешь в премьере или обычном мм?'
+    ],
+    responses: [
+      'Mirage — моя любимая карта, на B сайте отлично держу',
+      'Недавно апнул глобал, но в премьере 18к стоит',
+      'Согласись, новый скины на AWP огонь',
+      'Был на BLAST вчера, нон-стоп грелся',
+      'Кейсы не открываю, лучше сразу скин купить',
+      'Не люблю Inferno, слишком медленная',
+      'Префайр научился делать, иначе никак на этом ранге',
+      'Стреляешь бёрстами или тапаешь?',
+      's1mple回归 — это контент года',
+      'У тебя какой sens? У меня 2.0 при 400 dpi',
+      'Кроссхайр уже год не меняю, привык',
+      'FACEIT 10 lvl, но устал от токсиков'
+    ],
+    questions: [
+      'Какой у тебя ранг?',
+      'Любимая карта?',
+      'Кто фаворит игрок про-сцены?',
+      'Команду имеешь или соло катаешь?',
+      'Что думаешь о новом патче?',
+      'Пробовал новый case?'
+    ]
+  },
+  dota: {
+    nicks: ['MidOrFeed', 'RoshanSlayer', 'TiltMasterFlex', 'CreepScoreGod', 'SupportSucks', 'Pos1Dreamer', 'GG_WP_69'],
+    greetings: [
+      'Привет! Какой MMR?',
+      'Хай, любишь в доту катать?',
+      'Йоу, какой герой твой мейн?',
+      'Привет, устал от турбо, го поговорим',
+      'Хей, видел новый патч? Immortal снова сломали'
+    ],
+    responses: [
+      'На миде катаю, Puck и Storm мой выбор',
+      'Последний патч сломал Bristle, уже нерфят',
+      'TI был огонь, но наш Western Europe зашквар',
+      'Турбо — лучший режим, не спорь',
+      'Калибровка 4.5к, но поведение F',
+      'Support мейн тут, руки болят от хила',
+      'Behaviour score 12k, жизнь налаживается',
+      'Позиция 1 — страдаю, но керри',
+      'Invoker max сложности, но оно того стоит',
+      'Линия оффлейн — лучшее, что придумали',
+      'Недавно бросил доту, но всё равно смотрю турниры',
+      'RP дают за что угодно, система сломана'
+    ],
+    questions: [
+      'На какой позиции играешь?',
+      'Какой MMR?',
+      'Любимый герой?',
+      'Турбо или рейтинг?',
+      'Смотрел TI в этом году?'
+    ]
+  },
+  valorant: {
+    nicks: ['RadiantReaper', 'JettMain_99', 'SageHealsOnly', 'OperatorOneTap', 'SpikeRushKid', 'CrosshairGod'],
+    greetings: [
+      'Привет! Какой ранг в Valorant?',
+      'Хай, играешь наRanked?',
+      'Йоу, кто твой мейн агент?',
+      'Привет, го поговорим про валорант',
+      'Хей, видел новую коллекцию в магазине?'
+    ],
+    responses: [
+      'Jett — мой мейн, dash и блейд шторм решают',
+      'На Bind играю на attack, split берётся легко',
+      'Sage основа команды, без неё никак',
+      'Radiant это боль, но достижимо',
+      'Новый agent сломанный, нервнут в следующем патче',
+      'Operator слишком дорогая, но на B site мастхэв',
+      'Premier режим — лучший новинка этого года',
+      'Аим тренировки каждый день, иначе никак',
+      'Crosshair code: 0;P;h;0;f;0;0l;4;0o;2;0a;1;0f;0;1b;0',
+      'Скины стоят своих денег, особенно Reaver Vandal'
+    ],
+    questions: [
+      'Какой ранг?',
+      'Кто твой мейн агент?',
+      'Любимая карта?',
+      'Аим тренируешь?',
+      'Скины покупаешь?'
+    ]
+  },
+  anime: {
+    nicks: ['SakuraDreamer', 'TsundereSenpai', 'OtakuMaster', 'KawaiiDesu', 'ShonenSoul', 'MangaOnly_88'],
+    greetings: [
+      'Привет! Что последнее смотрел?',
+      'Хай, аниме фэн?',
+      'Йоу, видел новый сезон JJK?',
+      'Привет, что посоветуешь из сёнена?',
+      'Хей, мангач или анимешник?'
+    ],
+    responses: [
+      'Jujutsu Kaisen второй сезон — шедевр',
+      'One Piece в этом году выдали невероятное',
+      'Frieren — лучшее, что вышло осенью',
+      'Я мангач, опережаю аниме на годы',
+      'Сёнен это жизнь, ненавижу эччи',
+      'Миядзаки = гений, спорить бесполезно',
+      'Bleach Thousand-Year Blood War воскресил франшизу',
+      'Chainsaw Man был разочарованием, не читай мангу',
+      'Solo Leveling аниме наконец-то вышло',
+      'Vinland Saga — лучший сэйнэн, точка',
+      'Не понимаю хайп вокруг Demon Slayer, сюжет банальный',
+      'Makoto Shinkai фильмы — визуальный экстаз'
+    ],
+    questions: [
+      'Что последнее смотрел?',
+      'Любимый тайтл?',
+      'Мангу читаешь?',
+      'Сёнен или сэйнэн?',
+      'Что посовуешь из новинок?'
+    ]
+  },
+  games: {
+    nicks: ['PixelPirate', 'GameMaster_X', 'RetroGamer_99', 'StoryModeFan', 'OpenWorldExplorer', 'NoLifer_42'],
+    greetings: [
+      'Привет! Во что сейчас играешь?',
+      'Хай, го обсудим игры?',
+      'Йоу, видел презентацию Sony?',
+      'Привет, что проходишь сейчас?',
+      'Хей, ПК или консоль?'
+    ],
+    responses: [
+      'Baldur\'s Gate 3 — игра года, точка',
+      'Elden Ring DLC вышел, я потерян для общества',
+      'Сейчас прохожу Cyberpunk 2077 Phantom Liberty',
+      'Hades 2 в раннем доступе, огонь',
+      'Не понимаю хайп вокруг GTA, сюжет скучный',
+      'Indie игры часто лучше AAA, факт',
+      'Stardew Valley = терапия после работы',
+      'Только что закончил Red Dead 2, рыдал',
+      'Factorio затянул на 500 часов',
+      'Hollow Knight Silksong жду всем сердцем',
+      'Прохожу Disco Elysium третий раз, шедевр',
+      'Коллекционирую ретро-консоли, недавно взял SNES'
+    ],
+    questions: [
+      'Во что сейчас играешь?',
+      'Любимая игра всех времён?',
+      'Ждёшь какой-то релиз?',
+      'ПК или консоль?',
+      'Инди любишь?'
+    ]
+  },
+  music: {
+    nicks: ['VinylHunter', 'BassDropAddict', 'SynthwaveSoul', 'IndieExplorer', 'LoFiChill', 'MetalHead_77'],
+    greetings: [
+      'Привет! Что слушаешь?',
+      'Хай, любимый жанр?',
+      'Йоу, видел новый альбом The Weeknd?',
+      'Привет, на чём музыку слушаешь?',
+      'Хей, го обсудим музыку?'
+    ],
+    responses: [
+      'Synthwave — лучший жанр для работы, не спорь',
+      'Сейчас на репите новый альбом Tame Impala',
+      'Чёрный Pumas открыли для меня soul',
+      'На виниле слушаю, звук теплее',
+      'Lo-fi girl спасает сессии',
+      'Не понимаю хайп вокруг Taylor Swift',
+      'Металл forever, BMTH топ',
+      'Discovery Weekly на Spotify — лучший способ найти новое',
+      'Russian doomer music это отдельный жанр',
+      'На концертах был 12 раз за год, жить не могу без этого',
+      'Классику тоже уважаю, Бах — это космос',
+      'Hip-hop 90-х навсегда в моём плейлисте'
+    ],
+    questions: [
+      'Что слушаешь сейчас?',
+      'Любимый жанр?',
+      'На концерты ходишь?',
+      'Винил или стриминг?',
+      'Кто твой любимый исполнитель?'
+    ]
+  },
+  movies: {
+    nicks: ['CinemaLover', 'CriticMind', 'IndieFilmBuff', 'TarantinoFan', 'ScifiGeek', 'NoirWatcher'],
+    greetings: [
+      'Привет! Что последнее смотрел?',
+      'Хай, любимый жанр в кино?',
+      'Йоу, видел Dune 2?',
+      'Привет, сериалы смотришь?',
+      'Хей, го обсудим кино?'
+    ],
+    responses: [
+      'Dune 2 — визуальный шедевр, лучше первой части',
+      'Breaking Bad до сих пор непревзойдён',
+      'Тарковский — это поэзия на плёнке',
+      'Не люблю Marvel, но Deadpool был огонь',
+      'Корея делает лучшее кино последнего десятилетия',
+      'Ситкомы — лучший способ отключить мозг',
+      'Анита Ordinary Angels изменила моё восприятие',
+      'Только что досмотрел Severance, мозг взорван',
+      'Таркентино никогда не подведёт',
+      'Сай-фай 70-80х — особая эстетика',
+      'HBO делает лучший контент, точка',
+      'Не понимаю хайп вокруг Wes Anderson'
+    ],
+    questions: [
+      'Что последнее смотрел?',
+      'Любимый фильм?',
+      'Сериалы смотришь?',
+      'Жанр предпочтения?',
+      'Кино или домашний просмотр?'
+    ]
+  },
+  code: {
+    nicks: ['FullStackNinja', 'Rustacean_42', 'TypeScriptLover', 'DevOpsSamurai', 'Pythonista', 'LinuxChad'],
+    greetings: [
+      'Привет! На чём пишешь?',
+      'Хай, какой стек?',
+      'Йоу, видел новую версию React?',
+      'Привет, го обсудим код?',
+      'Хей, frontend или backend?'
+    ],
+    responses: [
+      'TypeScript > JavaScript, спорить бесполезно',
+      'Rust — будущее системного программирования',
+      'React 19 с server components это игра',
+      'Python для прототипов, прод на Go',
+      'Vim навсегда, IDE для слабаков',
+      'Не понимаю хайп вокруг AI кодеров',
+      'Linux на десктопе уже 5 лет, не жалею',
+      'Docker изменил мою жизнь',
+      'TailwindCSS сэкономил мне сотни часов',
+      'Code review важнее самого кода',
+      'Big O нотация — то, что отличает программиста от кодера',
+      'PostgreSQL > MongoDB в 95% случаев'
+    ],
+    questions: [
+      'На чём пишешь?',
+      'Какой стек используешь?',
+      'Frontend или backend?',
+      'Что думаешь об AI в коде?',
+      'Vim или IDE?'
+    ]
+  },
+  books: {
+    nicks: ['BookwormAnna', 'FantasyFan', 'SciFiReader', 'DostoevskyEnjoyer', 'KindleAddict', 'ClassicLover'],
+    greetings: [
+      'Привет! Что читаешь?',
+      'Хай, любимая книга?',
+      'Йоу, видел новый роман Сандерсона?',
+      'Привет, бумага или электронка?',
+      'Хей, го обсудим книги?'
+    ],
+    responses: [
+      'Сейчас читаю Dune, вот это эпос',
+      'Сандерсон пишет как машина, но качество топ',
+      'Братья Карамазовы — книга на все времена',
+      'Пратчетт — гений юмора и фэнтези',
+      'Не понимаю хайп вокруг Maas',
+      'На Kindle читаю, удобно в метро',
+      'Бумажные книги для коллекции,Kindle для чтения',
+      'Лем и Брэдбери — основы сай-фай',
+      'Аудио книги помогли "прочитать" 30 книг за год',
+      'Фэнтези устал, перешёл на нон-фикшн',
+      'Булгаков это навсегда',
+      'Читаю 50 книг в год, не так уж и много'
+    ],
+    questions: [
+      'Что читаешь сейчас?',
+      'Любимая книга?',
+      'Бумага или электронка?',
+      'Любимый жанр?',
+      'Аудио книги пробовал?'
+    ]
+  },
+  sport: {
+    nicks: ['GymRat_99', 'RunnerHigh', 'CrossfitBeast', 'FootballFan', 'BasketballJunkie', 'YogaAndPeace'],
+    greetings: [
+      'Привет! Каким спортом занимаешься?',
+      'Хай, смотрел вчера матч?',
+      'Йоу, ходишь в зал?',
+      'Привет, го обсудим спорт?',
+      'Хей, какой вид спорта любишь?'
+    ],
+    responses: [
+      'Хожу в зал 4 раза в неделю, сплит тяга/жим/ноги',
+      'Бегаю полумарафоны, недавно выбежал из 1:30',
+      'Футбол — религия, Champions League моя жизнь',
+      'Crossfit изменил моё тело за полгода',
+      'Йога лучшее для головы, не только для тела',
+      'NBA — лучший спорт зрелищности',
+      'Не понимаю хайп вокруг кроссфита',
+      'Плавание недооценённое, полная тренировка',
+      'Tennis элитарный, но азартный',
+      'MMA — это шахматы с кровью',
+      'Cycling спас от депрессии',
+      'Волейбол на пляже = лучшее лето'
+    ],
+    questions: [
+      'Каким спортом занимаешься?',
+      'Смотрели вчерашний матч?',
+      'Ходишь в зал?',
+      'Любимый спортсмен?',
+      'Командный или индивидуальный?'
+    ]
+  },
+  art: {
+    nicks: ['PixelArtist', 'WatercolorDream', 'DigitalCanvas', 'SketchMaster', 'OilPainter', 'AbstractSoul'],
+    greetings: [
+      'Привет! Чем рисуешь?',
+      'Хай, традиционка или диджитал?',
+      'Йоу, видел новый Procreate?',
+      'Привет, го обсудим арт?',
+      'Хей, ты художник?'
+    ],
+    responses: [
+      'Procreate на iPad изменил мой процесс',
+      'Акварель — это медитация, не торопишь',
+      'Масло требует терпения, но результат того стоит',
+      'Не понимаю NFT хайп, искусство не про это',
+      'Анатомия — основа всего, без неё никак',
+      'Цвет теория изменила моё восприятие',
+      'Plein air лучший способ отдохнуть',
+      'Диджитал экономит время, но не развивает чувство материала',
+      'Кисти Wacom и Clip Studio Paint — мой набор',
+      'Жизнь с рисованием — это не романтика, а труд',
+      'Референсы — это нормально, не стыдно',
+      'Скетчбук всегда с собой, идеи приходят неожиданно'
+    ],
+    questions: [
+      'Чем рисуешь?',
+      'Традиционка или диджитал?',
+      'Любимый стиль?',
+      'Сколько лет рисуешь?',
+      'Что вдохновляет?'
+    ]
+  },
+  travel: {
+    nicks: ['BackpackerPro', 'DigitalNomad88', 'MountainClimber', 'CityExplorer', 'BeachBum_99', 'SoloTraveler'],
+    greetings: [
+      'Привет! Где был последний раз?',
+      'Хай, любимая страна?',
+      'Йоу, планируешь поездки?',
+      'Привет, го обсудим путешествия?',
+      'Хей, сколько стран уже?'
+    ],
+    responses: [
+      'Недавно вернулся из Японии, это другой мир',
+      'Азия дешевле Европы в разы, факт',
+      'Бэкпекинг changed my life навсегда',
+      'Не понимаю all-inclusive, разве это путешествие?',
+      'Соло-поездки — лучший способ узнать себя',
+      'Workaway помог сэкономить и узнать местных',
+      'Грузия — лучшее открытие этого года',
+      'Португалия недооценённая, Лиссабон огонь',
+      '90 дней в ЮВА — лучший опыт в жизни',
+      'Альпы зимой это сказка, дороже, но стоит',
+      'Парагвай, Боливия — дикий Запад южной америки',
+      'Цифровой кочевник 3 года, не жалею'
+    ],
+    questions: [
+      'Где был последний раз?',
+      'Сколько стран уже?',
+      'Любимый стиль путешествий?',
+      'Соло или с компанией?',
+      'Куда мечтаешь поехать?'
+    ]
+  }
+};
+
+// ============== СОСТОЯНИЕ ==============
+
+let state = {
+  currentCategory: null,
+  partnerName: null,
+  partnerColor: null,
+  isSearching: false,
+  isChatting: false,
+  userLiked: false,
+  partnerLiked: false,
+  matchShown: false,
+  searchTimer: null,
+  typingTimer: null,
+  responseTimer: null,
+  messages: []
+};
+
+// ============== ИНИЦИАЛИЗАЦИЯ ==============
+
+function init() {
+  renderCategories();
+  setupReveal();
+  setupHeroCanvas();
+  startOnlineCounter();
+  
+  // обработчик Enter в поле ввода
+  document.getElementById('messageInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(e);
+    }
+  });
+}
+
+// рендер категорий
+function renderCategories() {
+  const grid = document.getElementById('categoriesGrid');
+  grid.innerHTML = categories.map(cat => `
+    <div class="category-card reveal" style="--cat-color: ${cat.color};" onclick="startSearch('${cat.id}')">
+      <div class="category-icon" style="background: ${cat.color};">
+        ${cat.icon}
+      </div>
+      <div class="font-display text-xl font-bold mb-1">${cat.name}</div>
+      <div class="text-sm mb-4" style="color: var(--muted);">${cat.desc}</div>
+      <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center gap-1.5" style="color: var(--muted);">
+          <span class="online-dot"></span>
+          <span class="font-mono">${cat.online.toLocaleString('ru-RU')} онлайн</span>
+        </div>
+        <div style="color: ${cat.color};" class="flex items-center gap-1 font-medium">
+          Начать
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  
+  // повторно навесить reveal observer
+  setupReveal();
+}
+
+// scroll reveal
+function setupReveal() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+  
+  document.querySelectorAll('.reveal:not(.visible)').forEach(el => observer.observe(el));
+}
+
+// ============== HERO CANVAS - соединения точек ==============
+
+function setupHeroCanvas() {
+  const canvas = document.getElementById('heroCanvas');
+  const ctx = canvas.getContext('2d');
+  let dots = [];
+  let mouse = { x: -1000, y: -1000 };
+  
+  function resize() {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    // создать точки
+    const count = Math.floor((canvas.width * canvas.height) / 18000);
+    dots = [];
+    for (let i = 0; i < count; i++) {
+      dots.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        r: Math.random() * 1.5 + 0.5
+      });
+    }
+  }
+  
+  resize();
+  window.addEventListener('resize', resize);
+  
+  canvas.parentElement.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  
+  canvas.parentElement.addEventListener('mouseleave', () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+  
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // обновить точки
+    dots.forEach(dot => {
+      dot.x += dot.vx;
+      dot.y += dot.vy;
+      
+      if (dot.x < 0 || dot.x > canvas.width) dot.vx *= -1;
+      if (dot.y < 0 || dot.y > canvas.height) dot.vy *= -1;
+      
+      // притяжение к мыши
+      const dx = mouse.x - dot.x;
+      const dy = mouse.y - dot.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 150 && dist > 0) {
+        dot.x += (dx / dist) * 0.5;
+        dot.y += (dy / dist) * 0.5;
+      }
+    });
+    
+    // соединения
+    for (let i = 0; i < dots.length; i++) {
+      for (let j = i + 1; j < dots.length; j++) {
+        const dx = dots[i].x - dots[j].x;
+        const dy = dots[i].y - dots[j].y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        
+        if (dist < 120) {
+          const alpha = (1 - dist / 120) * 0.3;
+          ctx.strokeStyle = `rgba(255, 46, 99, ${alpha})`;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(dots[i].x, dots[i].y);
+          ctx.lineTo(dots[j].x, dots[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    
+    // точки
+    dots.forEach(dot => {
+      ctx.fillStyle = 'rgba(255, 46, 99, 0.6)';
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    
+    requestAnimationFrame(animate);
+  }
+  
+  animate();
+}
+
+// счётчик онлайн
+function startOnlineCounter() {
+  const el = document.getElementById('onlineCount');
+  let current = 2847;
+  
+  setInterval(() => {
+    current += Math.floor(Math.random() * 7) - 3;
+    if (current < 2700) current = 2700;
+    if (current > 3100) current = 3100;
+    el.textContent = current.toLocaleString('ru-RU');
+  }, 3000);
+}
+
+// ============== ПОИСК СОБЕСЕДНИКА ==============
+
+function scrollToCategories() {
+  document.getElementById('categories').scrollIntoView({ behavior: 'smooth' });
+}
+
+function startSearch(categoryId) {
+  if (state.isSearching || state.isChatting) return;
+  
+  const cat = categories.find(c => c.id === categoryId);
+  if (!cat) return;
+  
+  state.currentCategory = categoryId;
+  state.isSearching = true;
+  
+  // показать оверлей
+  document.getElementById('chatOverlay').classList.add('active');
+  document.getElementById('searchState').style.display = 'flex';
+  document.getElementById('chatState').style.display = 'none';
+  document.getElementById('searchCategory').textContent = `Категория: ${cat.name}`;
+  
+  // статус сообщения по таймеру
+  const statuses = [
+    'Подключаемся к сети...',
+    'Ищем собеседника в категории ' + cat.name + '...',
+    'Нашли несколько кандидатов...',
+    'Соединяем вас с лучшим совпадением...',
+    'Почти готово...'
+  ];
+  
+  let idx = 0;
+  document.getElementById('searchStatus').textContent = statuses[0];
+  
+  const statusInterval = setInterval(() => {
+    idx++;
+    if (idx < statuses.length) {
+      document.getElementById('searchStatus').textContent = statuses[idx];
+    }
+  }, 700);
+  
+  // имитация поиска
+  state.searchTimer = setTimeout(() => {
+    clearInterval(statusInterval);
+    if (state.isSearching) {
+      connectToPartner();
+    }
+  }, 2800 + Math.random() * 1500);
+}
+
+function cancelSearch() {
+  state.isSearching = false;
+  clearTimeout(state.searchTimer);
+  document.getElementById('chatOverlay').classList.remove('active');
+}
+
+// ============== ПОДКЛЮЧЕНИЕ К СОБЕСЕДНИКУ ==============
+
+function connectToPartner() {
+  const cat = categories.find(c => c.id === state.currentCategory);
+  const botInfo = botData[state.currentCategory];
+  
+  // случайный ник
+  state.partnerName = botInfo.nicks[Math.floor(Math.random() * botInfo.nicks.length)];
+  state.partnerColor = cat.color;
+  state.userLiked = false;
+  state.partnerLiked = false;
+  state.matchShown = false;
+  state.messages = [];
+  state.isSearching = false;
+  state.isChatting = true;
+  
+  // обновить UI
+  document.getElementById('searchState').style.display = 'none';
+  document.getElementById('chatState').style.display = 'flex';
+  
+  // шапка
+  const avatar = document.getElementById('partnerAvatar');
+  avatar.textContent = state.partnerName[0].toUpperCase();
+  avatar.style.background = `linear-gradient(135deg, ${state.partnerColor}, ${shiftColor(state.partnerColor, 40)})`;
+  
+  document.getElementById('partnerName').textContent = state.partnerName;
+  document.getElementById('partnerCategory').textContent = cat.name + ' · онлайн';
+  
+  // сбросить лайк
+  document.getElementById('likeBtn').classList.remove('liked');
+  document.getElementById('matchNotice').classList.add('hidden');
+  
+  // очистить сообщения
+  document.getElementById('messagesContainer').innerHTML = '';
+  
+  // системное сообщение
+  addMessage('Вы соединены с ' + state.partnerName + '. Категория: ' + cat.name, 'system');
+  
+  // бот пишет первым через 1-2 сек
+  setTimeout(() => {
+    if (state.isChatting) {
+      const greeting = botInfo.greetings[Math.floor(Math.random() * botInfo.greetings.length)];
+      receiveMessage(greeting);
+    }
+  }, 1500 + Math.random() * 1000);
+  
+  // запустить возможный автолайк от партнёра
+  schedulePartnerLike();
+}
+
+function shiftColor(hex, amount) {
+  const r = Math.min(255, parseInt(hex.slice(1, 3), 16) + amount);
+  const g = Math.min(255, parseInt(hex.slice(3, 5), 16) + amount);
+  const b = Math.min(255, parseInt(hex.slice(5, 7), 16) + amount);
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+// ============== СООБЩЕНИЯ ==============
+
+function sendMessage(e) {
+  e.preventDefault();
+  const input = document.getElementById('messageInput');
+  const text = input.value.trim();
+  if (!text || !state.isChatting) return;
+  
+  addMessage(text, 'sent');
+  input.value = '';
+  
+  // запланировать ответ бота
+  scheduleBotReply(text);
+}
+
+function scheduleBotReply(userText) {
+  // показать "печатает..."
+  setTimeout(() => {
+    if (!state.isChatting) return;
+    showTyping();
+  }, 500 + Math.random() * 800);
+  
+  // ответ через 1.5-3.5 сек
+  const delay = 1500 + Math.random() * 2000;
+  state.responseTimer = setTimeout(() => {
+    if (!state.isChatting) return;
+    hideTyping();
+    
+    const botInfo = botData[state.currentCategory];
+    let reply;
+    
+    // 30% шанс на вопрос, иначе обычный ответ
+    if (Math.random() < 0.35) {
+      reply = botInfo.questions[Math.floor(Math.random() * botInfo.questions.length)];
+    } else {
+      reply = botInfo.responses[Math.floor(Math.random() * botInfo.responses.length)];
+    }
+    
+    receiveMessage(reply);
+  }, delay);
+}
+
+function showTyping() {
+  const container = document.getElementById('messagesContainer');
+  // удалить существующий
+  if (document.getElementById('typingIndicator')) return;
+  
+  const div = document.createElement('div');
+  div.id = 'typingIndicator';
+  div.className = 'message received';
+  div.style.padding = '12px 16px';
+  div.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  container.appendChild(div);
+  scrollMessages();
+}
+
+function hideTyping() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
+function receiveMessage(text) {
+  addMessage(text, 'received');
+}
+
+function addMessage(text, type) {
+  const container = document.getElementById('messagesContainer');
+  const div = document.createElement('div');
+  div.className = `message ${type}`;
+  div.textContent = text;
+  container.appendChild(div);
+  state.messages.push({ text, type });
+  scrollMessages();
+}
+
+function scrollMessages() {
+  const container = document.getElementById('messagesContainer');
+  setTimeout(() => {
+    container.scrollTop = container.scrollHeight;
+  }, 50);
+}
+
+// ============== ЛАЙКИ ==============
+
+function likePartner() {
+  if (!state.isChatting || state.userLiked) return;
+  
+  state.userLiked = true;
+  document.getElementById('likeBtn').classList.add('liked');
+  showToast('Ты поставил лайк!', 'success');
+  
+  // если партнёр ещё не лайкнул, ждём
+  if (!state.partnerLiked) {
+    // запланировать ответный лайк (60% шанс)
+    if (Math.random() < 0.7) {
+      setTimeout(() => {
+        if (state.isChatting && state.userLiked && !state.partnerLiked) {
+          state.partnerLiked = true;
+          showMatch();
+        }
+      }, 3000 + Math.random() * 5000);
+    }
+  } else {
+    showMatch();
+  }
+}
+
+function schedulePartnerLike() {
+  // партнёр может лайкнуть первым
+  if (Math.random() < 0.25) {
+    setTimeout(() => {
+      if (state.isChatting && !state.partnerLiked && !state.userLiked) {
+        state.partnerLiked = true;
+        showToast(state.partnerName + ' поставил тебе лайк!', 'success');
+        
+        // если юзер уже лайкнул (маловероятно, но всё же)
+        if (state.userLiked) {
+          showMatch();
+        }
+      }
+    }, 8000 + Math.random() * 12000);
+  }
+}
+
+function showMatch() {
+  if (state.matchShown) return;
+  state.matchShown = true;
+  
+  // системное сообщение
+  addMessage('✨ Взаимная симпатия! Вы можете обменяться контактами.', 'system');
+  
+  // показать баннер
+  document.getElementById('matchNotice').classList.remove('hidden');
+  
+  showToast('Взаимный лайк! Вы можете обменяться контактами.', 'success');
+}
+
+function shareContact() {
+  // сгенерировать фейковый контакт
+  const username = '@' + state.partnerName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  addMessage(state.partnerName + ' поделился контактом: ' + username + ' (Telegram)', 'system');
+  document.getElementById('matchNotice').classList.add('hidden');
+  showToast('Контакт отправлен в чат', 'success');
+}
+
+// ============== УПРАВЛЕНИЕ ЧАТОМ ==============
+
+function nextPartner() {
+  if (!state.isChatting && !state.isSearching) return;
+  
+  // очистить таймеры
+  clearTimeout(state.responseTimer);
+  clearTimeout(state.typingTimer);
+  
+  state.isChatting = false;
+  state.isSearching = false;
+  hideTyping();
+  
+  // начать новый поиск
+  startSearch(state.currentCategory);
+}
+
+function endChat() {
+  clearTimeout(state.responseTimer);
+  clearTimeout(state.typingTimer);
+  clearTimeout(state.searchTimer);
+  
+  state.isChatting = false;
+  state.isSearching = false;
+  state.currentCategory = null;
+  state.messages = [];
+  
+  document.getElementById('chatOverlay').classList.remove('active');
+  document.getElementById('searchState').style.display = 'none';
+  document.getElementById('chatState').style.display = 'none';
+}
+
+// ============== TOAST ==============
+
+function showToast(text, type = '') {
+  const toast = document.getElementById('toast');
+  toast.textContent = '';
+  toast.className = 'toast ' + type;
+  
+  // иконка
+  const icon = document.createElement('span');
+  if (type === 'success') {
+    icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
+  } else if (type === 'error') {
+    icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+  }
+  toast.appendChild(icon);
+  
+  const span = document.createElement('span');
+  span.textContent = text;
+  toast.appendChild(span);
+  
+  setTimeout(() => toast.classList.add('show'), 10);
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+// ============== ЗАПУСК ==============
+
+init();
+</script>
+
+</body>
+</html>
